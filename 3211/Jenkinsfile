@@ -80,16 +80,31 @@ pipeline {
 
         stage('쿠버네티스 배포') {
             steps {
-                // K8S 배포
-                sh "kubectl apply -f ./${CLASS_NUM}/deploy/k8s/namespace.yaml"
-                sh "kubectl apply -f ./${CLASS_NUM}/deploy/k8s/configmap.yaml"
-                sh "kubectl apply -f ./${CLASS_NUM}/deploy/k8s/secret.yaml"
-                sh "kubectl apply -f ./${CLASS_NUM}/deploy/k8s/service.yaml"
-                sh "kubectl apply -f ./${CLASS_NUM}/deploy/k8s/serviceaccount.yaml"
-                sh "kubectl apply -f ./${CLASS_NUM}/deploy/k8s/secret-token.yaml"
-                sh "kubectl apply -f ./${CLASS_NUM}/deploy/k8s/role.yaml"
-                sh "kubectl apply -f ./${CLASS_NUM}/deploy/k8s/rolebinding.yaml"
-                sh "kubectl apply -f ./${CLASS_NUM}/deploy/k8s/deployment.yaml"
+                script {
+                    // admin.conf 파일을 등록한 실제 Credentials ID로 변경하세요.
+                    withCredentials([file(credentialsId: 'k8s_master_config', variable: 'KUBECONFIG_FILE')]) {
+                        
+                        sh """
+                            # 1. KUBECONFIG 환경 변수를 설정하여 kubectl이 해당 파일 사용을 강제
+                            export KUBECONFIG=\$KUBECONFIG_FILE
+                            
+                            echo "Kubernetes 배포 시작..."
+                            
+                            # 2. K8S 배포 실행
+                            kubectl apply -f ./${CLASS_NUM}/deploy/k8s/namespace.yaml
+                            kubectl apply -f ./${CLASS_NUM}/deploy/k8s/configmap.yaml
+                            kubectl apply -f ./${CLASS_NUM}/deploy/k8s/secret.yaml
+                            kubectl apply -f ./${CLASS_NUM}/deploy/k8s/service.yaml
+                            kubectl apply -f ./${CLASS_NUM}/deploy/k8s/serviceaccount.yaml
+                            kubectl apply -f ./${CLASS_NUM}/deploy/k8s/secret-token.yaml
+                            kubectl apply -f ./${CLASS_NUM}/deploy/k8s/role.yaml
+                            kubectl apply -f ./${CLASS_NUM}/deploy/k8s/rolebinding.yaml
+                            kubectl apply -f ./${CLASS_NUM}/deploy/k8s/deployment.yaml
+
+                            echo "Kubernetes 배포 완료."
+                        """
+                    }
+                }
             }
         }
     }
