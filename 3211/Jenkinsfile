@@ -8,7 +8,8 @@ pipeline {
 
     environment {
         // 본인의 DockerHub username로 수정 해주세요.
-        DOCKERHUB_USERNAME = 'gmltn328'
+		DOCKERHUB_CREDENTIALS_ID = 'docker_password'
+        DOCKERHUB_USERNAME = ''
         // 배포용 Github - Sprint3를 Fork 후 Username 변경 해주세요.
         RELEASE_GITHUB_URL = 'https://github.com/naGGuri/kubernetes-anotherclass-sprint3.git'
         // App용 Github - Api-Tester App 소스코드를 Fork 후 Username 변경 해주세요.
@@ -53,11 +54,26 @@ pipeline {
             }
         }
 
-        stage('컨테이너 업로드') {
+		stage('컨테이너 업로드') {
             steps {
                 // DockerHub로 이미지 업로드
-                script{
-                    sh "docker push ${DOCKERHUB_USERNAME}/api-tester:${APP_VERSION}"
+                script {
+                    // **[수정된 부분 시작]**
+                    // Jenkins Credentials를 환경 변수 DOCKER_USER/DOCKER_PASS로 바인딩
+                    withCredentials([usernamePassword(
+                        credentialsId: "${DOCKERHUB_CREDENTIALS_ID}", 
+                        usernameVariable: 'DOCKER_USER', 
+                        passwordVariable: 'DOCKER_PASS')]) {
+                        
+                        sh """
+                            # 1. 도커 로그인: 비밀번호를 표준 입력으로 안전하게 전달
+                            echo "\$DOCKER_PASS" | docker login -u "\$DOCKER_USER" --password-stdin
+
+                            # 2. 이미지 푸시
+                            docker push ${DOCKERHUB_USERNAME}/api-tester:${APP_VERSION}
+                        """
+                    }
+                    // **[수정된 부분 끝]**
                 }
             }
         }
