@@ -7,12 +7,13 @@ pipeline {
     }
 
     environment {
-        // 본인의 DockerHub username로 수정 해주세요.
-        DOCKERHUB_USERNAME = '1pro'
-        // 배포용 Github - Sprint3를 Fork 후 Username 변경 해주세요.
-        RELEASE_GITHUB_URL = 'https://github.com/k8s-1pro/kubernetes-anotherclass-sprint3.git'
-        // App용 Github - Api-Tester App 소스코드를 Fork 후 Username 변경 해주세요.
-        APP_GITHUB_URL = 'https://github.com/k8s-1pro/kubernetes-anotherclass-api-tester.git'
+         // 본인의 DockerHub username로 수정 해주세요.
+        		DOCKERHUB_CREDENTIALS_ID = 'docker_password'
+                DOCKERHUB_USERNAME = 'gmltn328'
+                // 배포용 Github - Sprint3를 Fork 후 Username 변경 해주세요.
+                RELEASE_GITHUB_URL = 'https://github.com/naGGuri/kubernetes-anotherclass-sprint3.git'
+                // App용 Github - Api-Tester App 소스코드를 Fork 후 Username 변경 해주세요.
+                APP_GITHUB_URL = 'https://github.com/naGGuri/kubernetes-anotherclass-api-tester.git'
 
         APP_VERSION = '3.0.0'
         // 실습 넘버링
@@ -56,20 +57,48 @@ pipeline {
         stage('컨테이너 업로드') {
             steps {
                 // DockerHub로 이미지 업로드
-                script{
-                    sh "docker push ${DOCKERHUB_USERNAME}/api-tester:${APP_VERSION}"
+                script {
+                    // Jenkins Credentials를 환경 변수 DOCKER_USER/DOCKER_PASS로 바인딩
+                    withCredentials([usernamePassword(
+                        credentialsId: "${DOCKERHUB_CREDENTIALS_ID}",
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS')]) {
+
+                        sh """
+                            # 1. 도커 로그인: 비밀번호를 표준 입력으로 안전하게 전달
+                            echo "\$DOCKER_PASS" | docker login -u "\$DOCKER_USER" --password-stdin
+
+                            # 2. 이미지 푸시
+                            docker push ${DOCKERHUB_USERNAME}/api-tester:${APP_VERSION}
+                        """
+                    }
                 }
             }
         }
 
         stage('쿠버네티스 배포') {
             steps {
-                // K8S 배포
-                sh "kubectl apply -f ./${CLASS_NUM}/deploy/k8s/namespace.yaml"
-                sh "kubectl apply -f ./${CLASS_NUM}/deploy/k8s/configmap.yaml"
-                sh "kubectl apply -f ./${CLASS_NUM}/deploy/k8s/secret.yaml"
-                sh "kubectl apply -f ./${CLASS_NUM}/deploy/k8s/service.yaml"
-                sh "kubectl apply -f ./${CLASS_NUM}/deploy/k8s/deployment.yaml"
+                script {
+                    // admin.conf 파일을 등록한 실제 Credentials ID로 변경하세요.
+                    withCredentials([file(credentialsId: 'k8s_master_config', variable: 'KUBECONFIG_FILE')]) {
+
+                        sh """
+                            # 1. KUBECONFIG 환경 변수를 설정하여 kubectl이 해당 파일 사용을 강제
+                            export KUBECONFIG=\$KUBECONFIG_FILE
+
+                            echo "Kubernetes 배포 시작..."
+
+                            # 2. K8S 배포 실행
+                            sh "kubectl apply -f ./${CLASS_NUM}/deploy/k8s/namespace.yaml"
+                            sh "kubectl apply -f ./${CLASS_NUM}/deploy/k8s/configmap.yaml"
+                            sh "kubectl apply -f ./${CLASS_NUM}/deploy/k8s/secret.yaml"
+                            sh "kubectl apply -f ./${CLASS_NUM}/deploy/k8s/service.yaml"
+                            sh "kubectl apply -f ./${CLASS_NUM}/deploy/k8s/deployment.yaml"
+
+                            echo "Kubernetes 배포 완료."
+                        """
+                    }
+                }
             }
         }
     }
